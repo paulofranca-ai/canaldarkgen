@@ -1,0 +1,5 @@
+{
+  "name": "CanalDarkGen",
+  "description": "Gerador de vídeos Dark robusto para YouTube usando Gemini Pro para roteiro e imagens, integrado com ElevenLabs para narração cinematográfica.",
+  "requestFramePermissions": []
+}
