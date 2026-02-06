@@ -2,6 +2,7 @@
 export interface ScriptScene {
   id: string;
   narration: string;
+  narration_translation?: string; // Novo campo para tradução de referência
   visual_prompt: string;
   image_url?: string;
   audio_url?: string;
@@ -26,8 +27,8 @@ export type SpecialFX = 'none' | 'film_grain' | 'vhs_glitch' | 'cinematic_dust';
 export type Nationality = 'PT-BR' | 'US';
 
 export type AiProvider = 'openai' | 'gemini' | 'grok';
-// AudioProvider expandido para sub-modos
-export type AudioProvider = 'openai_hd' | 'openai_standard' | 'elevenlabs_turbo' | 'elevenlabs_quality' | 'browser_free';
+// AudioProvider atualizado sem standard
+export type AudioProvider = 'openai_hd' | 'elevenlabs_turbo' | 'elevenlabs_quality' | 'browser_free';
 
 export interface VoicePreset {
   id: string;
