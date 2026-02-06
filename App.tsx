@@ -5,14 +5,16 @@ import {
   RefreshCw, Skull, Ghost, Volume2, Zap, ChevronRight, Flame, Wind,
   Music as MusicIcon, Upload, VolumeX, Play, Clapperboard, Sparkles, Tv,
   Flag, Heart, Trash2, Save, Timer, Scissors, TrendingUp, BookOpen, Pause, BrainCircuit,
-  Settings as SettingsIcon
+  Settings as SettingsIcon, Lock
 } from 'lucide-react';
 import ScriptEditor from './components/ScriptEditor';
 import MediaGenerator from './components/MediaGenerator';
 import PreviewPlayer from './components/PreviewPlayer';
 import SettingsDialog from './components/SettingsDialog';
+import LoginScreen from './components/LoginScreen';
 import { generateStoryScript, generateViralIdeas } from './services/gemini';
 import { getVoices, PREDEFINED_VOICES } from './services/elevenlabs';
+import { authService } from './services/auth';
 import { AppStep, ScriptScene, ProjectConfig, Voice, EmotionPreset, SpecialFX, Nationality, VoicePreset, VoiceSettings, VideoType, AudioProvider } from './types';
 
 const EMOTION_PRESETS: { id: EmotionPreset; label: string; icon: any; settings: VoiceSettings }[] = [
@@ -37,6 +39,11 @@ const FX_OPTIONS: { id: SpecialFX, label: string, icon: any }[] = [
 ];
 
 const App = () => {
+  // --- AUTH STATES ---
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [hasVault, setHasVault] = useState(false);
+  
+  // --- APP STATES ---
   const [step, setStep] = useState<AppStep>('input');
   const [voices, setVoices] = useState<Voice[]>(PREDEFINED_VOICES);
   const [customPresets, setCustomPresets] = useState<VoicePreset[]>([]);
@@ -72,8 +79,15 @@ const App = () => {
   const [isGeneratingIdeas, setIsGeneratingIdeas] = useState(false);
   const [script, setScript] = useState<ScriptScene[]>([]);
 
-  // Carrega settings e vozes
+  // Verifica status do cofre ao carregar
   useEffect(() => {
+    setHasVault(authService.hasVault());
+  }, []);
+
+  // Carrega settings e vozes APÓS autenticação
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
     getVoices().then(allVoices => {
         setVoices(allVoices);
         if(!projectConfig.elevenLabsVoiceId && allVoices.length > 0) {
@@ -84,29 +98,14 @@ const App = () => {
     const savedPresets = localStorage.getItem('darkstream_voice_presets_v2');
     if (savedPresets) setCustomPresets(JSON.parse(savedPresets));
     
-    const savedProvider = localStorage.getItem('darkstream_audio_provider') as AudioProvider;
-    if (savedProvider) setCurrentAudioProvider(savedProvider);
+    // Carrega provider preferido (não sensível)
+    const providers = authService.getProviders();
+    setCurrentAudioProvider(providers.audio);
 
-    // Verificação segura de chaves usando process.env
-    const hasStoredKeys = localStorage.getItem('darkstream_api_keys');
-    const hasEnvKeys = process.env.VITE_OPENAI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-    
-    if (!hasStoredKeys && !hasEnvKeys) {
-      setTimeout(() => setShowSettings(true), 1000);
-    }
-    
     return () => {
       if(voicePreviewRef.current) voicePreviewRef.current.pause();
     };
-  }, []);
-
-  // Recarrega provider quando fecha modal de settings
-  useEffect(() => {
-    if (!showSettings) {
-        const p = localStorage.getItem('darkstream_audio_provider') as AudioProvider;
-        if (p) setCurrentAudioProvider(p);
-    }
-  }, [showSettings]);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     const calculatedScenes = Math.ceil(projectConfig.totalDuration / projectConfig.imageDuration);
@@ -114,6 +113,24 @@ const App = () => {
       setProjectConfig(prev => ({ ...prev, sceneCount: calculatedScenes }));
     }
   }, [projectConfig.totalDuration, projectConfig.imageDuration]);
+
+  // Se não estiver autenticado, mostra login ou setup
+  if (!isAuthenticated) {
+    return (
+      <LoginScreen 
+        isSetupMode={!hasVault} 
+        onUnlock={() => {
+          setIsAuthenticated(true);
+          setHasVault(true);
+        }} 
+      />
+    );
+  }
+
+  const handleLogout = () => {
+    authService.lock();
+    setIsAuthenticated(false);
+  };
 
   const handleTypeChange = (type: VideoType) => {
     setProjectConfig(prev => ({
@@ -238,14 +255,21 @@ const App = () => {
           <div className="flex items-center gap-4">
             <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/10 rounded-full">
               <Zap className="w-3 h-3 text-primary animate-pulse" />
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">IA Powered • v3.5</span>
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Cofre Aberto</span>
             </div>
             <button 
               onClick={() => setShowSettings(true)}
               className="p-2 text-slate-400 hover:text-white bg-white/5 rounded-full hover:bg-white/10 transition-colors"
-              title="Configurar API Key"
+              title="Cofre & Chaves"
             >
               <SettingsIcon className="w-5 h-5" />
+            </button>
+            <button 
+              onClick={handleLogout}
+              className="p-2 text-red-500 hover:text-red-400 bg-red-500/10 rounded-full hover:bg-red-500/20 transition-colors"
+              title="Bloquear (Sair)"
+            >
+              <Lock className="w-5 h-5" />
             </button>
           </div>
         </div>
